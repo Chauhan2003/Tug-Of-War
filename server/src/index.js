@@ -21,7 +21,7 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // Middleware
 app.use(cors({
-  origin: [CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174'],
+  origin: [CLIENT_URL, 'http://localhost:5173', 'https://math-tug-of-war.netlify.app'],
   credentials: true,
 }));
 app.use(express.json());
@@ -29,7 +29,7 @@ app.use(express.json());
 // Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: [CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174'],
+    origin: [CLIENT_URL, 'http://localhost:5173', 'https://math-tug-of-war.netlify.app'],
     methods: ['GET', 'POST'],
     credentials: true,
   },
