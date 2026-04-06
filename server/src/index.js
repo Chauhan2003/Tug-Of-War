@@ -8,6 +8,9 @@ console.log("Redis Config:", {
   db: process.env.REDIS_DB
 });
 
+console.log("Client URL:", process.env.CLIENT_URL);
+console.log("Port:", process.env.PORT);
+
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
