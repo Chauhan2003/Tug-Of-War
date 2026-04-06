@@ -6,18 +6,24 @@ class CacheManager {
     this.client = null;
     this.connected = false;
     this.config = {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
-      password: process.env.REDIS_PASSWORD,
-      db: process.env.REDIS_DB || 0,
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true
+      url: process.env.REDIS_URL,
+      socket: {
+        connectTimeout: 10000,
+        keepAlive: true,
+        keepAliveInitialDelay: 30000
+      },
+      database: parseInt(process.env.REDIS_DB || '0', 10)
     };
   }
 
   async connect() {
     try {
+      if (!this.config.url) {
+        logger.warn('REDIS_URL is not set, cache will be disabled');
+        this.connected = false;
+        return false;
+      }
+
       this.client = redis.createClient(this.config);
       
       this.client.on('error', (err) => {

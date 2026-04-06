@@ -1,16 +1,5 @@
 require("dotenv").config();
 
-// Debug environment variables
-console.log("Redis Config:", {
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
-  password: process.env.REDIS_PASSWORD ? "***" : "empty",
-  db: process.env.REDIS_DB
-});
-
-console.log("Client URL:", process.env.CLIENT_URL);
-console.log("Port:", process.env.PORT);
-
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
