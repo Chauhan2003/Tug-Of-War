@@ -78,6 +78,16 @@ Promise.all([getDb(), cache.connect()])
 // Setup socket handlers
 setupSocket(io);
 
+// Root route for health checks
+app.get("/", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "tug-of-war-server",
+    environment: process.env.NODE_ENV || "development",
+    timestamp: new Date().toISOString()
+  });
+});
+
 // REST API Routes with rate limiting
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authLimiter, authRoutes);
