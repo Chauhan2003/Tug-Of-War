@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const roomManager = require('./roomManager');
-const { getDb } = require('../db/setup');
+const { getDb } = require('../db/mongodb');
 
 function setupSocket(io) {
   // Authenticate socket connections
@@ -281,44 +281,53 @@ function endGame(io, code, winnerId) {
   const gs = room.gameState;
 
   // Save match to database
-  try {
-    const db = getDb();
-    const p1 = room.players[0];
-    const p2 = room.players[1];
+  (async () => {
+    try {
+      const db = await getDb();
+      const p1 = room.players[0];
+      const p2 = room.players[1];
 
-    db.prepare(`
-      INSERT INTO match_history (room_code, player1_id, player2_id, player1_score, player2_score, winner_id, mode, duration)
-      VALUES (?, ?, ?, ?, ?, ?, 'multiplayer', ?)
-    `).run(
-      code,
-      p1?.id,
-      p2?.id,
-      gs.scores[p1?.id] || 0,
-      gs.scores[p2?.id] || 0,
-      winnerId,
-      gs.endTime ? Math.round((gs.endTime - gs.startTime) / 1000) : room.options.timeLimit
-    );
+      await db.collection('match_history').insertOne({
+        room_code: code,
+        player1_id: p1?.id,
+        player2_id: p2?.id,
+        player1_score: gs.scores[p1?.id] || 0,
+        player2_score: gs.scores[p2?.id] || 0,
+        winner_id: winnerId,
+        mode: 'multiplayer',
+        duration: gs.endTime ? Math.round((gs.endTime - gs.startTime) / 1000) : room.options.timeLimit,
+        created_at: new Date().toISOString()
+      });
 
-    // Update stats for both players
-    for (const player of room.players) {
-      const won = player.id === winnerId;
-      const score = gs.scores[player.id] || 0;
-      const streak = gs.streaks[player.id] || 0;
-      const points = score * 10 + streak * 5 + (won ? 50 : 0);
+      // Update stats for both players
+      for (const player of room.players) {
+        const won = player.id === winnerId;
+        const score = gs.scores[player.id] || 0;
+        const streak = gs.streaks[player.id] || 0;
+        const points = score * 10 + streak * 5 + (won ? 50 : 0);
 
-      db.prepare(`
-        UPDATE users SET
-          total_points = total_points + ?,
-          matches_played = matches_played + 1,
-          wins = wins + ?,
-          losses = losses + ?,
-          best_streak = MAX(best_streak, ?)
-        WHERE id = ?
-      `).run(points, won ? 1 : 0, won ? 0 : 1, streak, player.id);
+        const currentUser = await db.collection('users').findOne(
+          { id: player.id },
+          { projection: { total_points: 1, matches_played: 1, wins: 1, losses: 1, best_streak: 1 } }
+        );
+
+        await db.collection('users').updateOne(
+          { id: player.id },
+          {
+            $set: {
+              total_points: currentUser.total_points + points,
+              matches_played: currentUser.matches_played + 1,
+              wins: currentUser.wins + (won ? 1 : 0),
+              losses: currentUser.losses + (won ? 0 : 1),
+              best_streak: Math.max(currentUser.best_streak, streak)
+            }
+          }
+        );
+      }
+    } catch (err) {
+      console.error('Error saving match:', err);
     }
-  } catch (err) {
-    console.error('Error saving match:', err);
-  }
+  })();
 
   io.to(code).emit('game-over', {
     winner: winnerId,

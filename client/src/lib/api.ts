@@ -111,10 +111,30 @@ export async function apiGetQuestion(classId?: number, levelId?: number) {
   });
 }
 
+// AI-powered question generation
+export async function apiGetAIQuestions(classId: number, levelId: string) {
+  return request('/game/questions', {
+    method: 'POST',
+    body: JSON.stringify({ classId, levelId }),
+  });
+}
+
+// AI service status
+export async function apiGetAIStatus() {
+  return request('/game/ai-status');
+}
+
+// Clear AI questions cache
+export async function apiClearAICache(classId: number, levelId: string) {
+  return request(`/game/cache/${classId}/${levelId}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function apiSubmitResult(result: {
   mode: string;
   classId?: number;
-  levelId?: number;
+  levelId?: number | string;
   playerScore: number;
   opponentScore: number;
   totalQuestions: number;

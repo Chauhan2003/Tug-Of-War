@@ -1,44 +1,64 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { apiSubmitResult } from '../../lib/api';
+import { apiSubmitResult } from '../lib/api';
+import { useAIQuestions, formatQuestion, getOperationSymbol, getDifficultyColor, getCategoryIcon } from '../hooks/useAIQuestions';
+import type { Question } from '../types/game';
 
-interface Question {
-  num1: number;
-  num2: number;
-  answer: number;
-  operation: string;
+interface GameState {
+  classId: number;
+  levelId: string;
+  className: string;
+  levelName: string;
 }
 
-export default function GameScreen() {
+export default function AIGameScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const gameState = location.state as GameState;
+  
   const [timeLeft, setTimeLeft] = useState(60);
   const [questionNumber, setQuestionNumber] = useState(1);
   const [totalQuestions] = useState(10);
   const [score, setScore] = useState({ player1: 0, player2: 0 });
   const [ropePosition, setRopePosition] = useState(50);
-  const [currentQuestion, setCurrentQuestion] = useState<Question>({ num1: 0, num2: 0, answer: 0, operation: '+' });
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [userAnswer, setUserAnswer] = useState('');
   const [streak, setStreak] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [pulling, setPulling] = useState<'left' | 'right' | null>(null);
   const [gameOver, setGameOver] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
   const gameOverRef = useRef(false);
+  const startTime = useRef(Date.now());
 
-  const generateQuestion = useCallback(() => {
-    const num1 = Math.floor(Math.random() * 20) + 1;
-    const num2 = Math.floor(Math.random() * 20) + 1;
-    const operations = ['+', '-'];
-    const operation = operations[Math.floor(Math.random() * operations.length)];
-    const answer = operation === '+' ? num1 + num2 : num1 - num2;
-    setCurrentQuestion({ num1, num2, answer, operation });
-    setUserAnswer('');
-    setFeedback(null);
-  }, []);
+  // AI Questions Hook
+  const { questions, loading, error, isAIGenerated, fetchQuestions } = useAIQuestions({
+    classId: gameState?.classId || 1,
+    levelId: gameState?.levelId || 'default',
+    enabled: true
+  });
 
+  // Initialize questions
   useEffect(() => {
-    generateQuestion();
-  }, [generateQuestion]);
+    if (!gameState) {
+      navigate('/select-level');
+      return;
+    }
+
+    fetchQuestions();
+  }, [gameState, fetchQuestions, navigate]);
+
+  // Set current question when questions are loaded
+  useEffect(() => {
+    if (questions.length > 0 && questionNumber <= questions.length) {
+      const question = questions[questionNumber - 1];
+      setCurrentQuestion(question);
+      setUserAnswer('');
+      setFeedback(null);
+      setShowExplanation(false);
+    }
+  }, [questions, questionNumber]);
 
   // Check win/lose on rope position change
   useEffect(() => {
@@ -57,11 +77,13 @@ export default function GameScreen() {
     if (!gameOver) return;
     const playerWon = ropePosition <= 50;
     const accuracy = totalQuestions > 0 ? Math.round((score.player1 / totalQuestions) * 100) : 0;
-    const duration = 60 - timeLeft;
+    const duration = Math.round((Date.now() - startTime.current) / 1000);
 
     // Submit to backend (fire-and-forget, don't block navigation)
     apiSubmitResult({
       mode: 'single',
+      classId: gameState.classId,
+      levelId: gameState.levelId,
       playerScore: score.player1,
       opponentScore: score.player2,
       totalQuestions,
@@ -72,10 +94,22 @@ export default function GameScreen() {
     }).catch(() => {});
 
     const timer = setTimeout(() => {
-      navigate('/result', { state: { score, streak, totalQuestions, playerWon } });
+      navigate('/result', { 
+        state: { 
+          score, 
+          streak, 
+          totalQuestions, 
+          playerWon,
+          classId: gameState.classId,
+          levelId: gameState.levelId,
+          className: gameState.className,
+          levelName: gameState.levelName,
+          isAIGenerated
+        } 
+      });
     }, 1200);
     return () => clearTimeout(timer);
-  }, [gameOver, ropePosition, navigate, score, streak, totalQuestions, timeLeft]);
+  }, [gameOver, ropePosition, navigate, score, streak, totalQuestions, gameState, isAIGenerated]);
 
   // Timer countdown
   useEffect(() => {
@@ -90,7 +124,7 @@ export default function GameScreen() {
   }, [timeLeft, questionNumber, totalQuestions, gameOver]);
 
   const handleSubmit = () => {
-    if (!userAnswer || feedback || gameOver) return;
+    if (!userAnswer || feedback || gameOver || !currentQuestion) return;
     const correct = parseInt(userAnswer) === currentQuestion.answer;
 
     if (correct) {
@@ -106,18 +140,18 @@ export default function GameScreen() {
       setRopePosition((prev) => Math.min(90, prev + 6));
       setStreak(0);
     }
+    setShowExplanation(true);
     setTimeout(() => setPulling(null), 600);
 
     setTimeout(() => {
       if (gameOverRef.current) return;
       if (questionNumber < totalQuestions) {
         setQuestionNumber((prev) => prev + 1);
-        generateQuestion();
       } else {
         gameOverRef.current = true;
         setGameOver(true);
       }
-    }, 800);
+    }, 2000); // Longer delay to show explanation
   };
 
   const handleNumberClick = (num: string) => {
@@ -146,13 +180,57 @@ export default function GameScreen() {
   const robotLean = pulling === 'right' ? 18 : pulling === 'left' ? -5 : 5;
 
   // Losing side gets pulled toward center. Winning side stays at edge.
-  // ropePosition: 10(player winning) ↔ 50(center) ↔ 90(robot winning)
-  // Player: normally at 4%. When losing (rope>50), gets pulled right toward center.
-  const playerX = ropePosition <= 50 ? 4 : 4 + (ropePosition - 50) * 0.8;   // 4% → ~36%
-  // Robot: normally at 4% from right. When losing (rope<50), gets pulled left toward center.
-  const robotX = ropePosition >= 50 ? 4 : 4 + (50 - ropePosition) * 0.8;    // 4% → ~36%
-  // Knot position on the rope between the two characters
+  const playerX = ropePosition <= 50 ? 4 : 4 + (ropePosition - 50) * 0.8;
+  const robotX = ropePosition >= 50 ? 4 : 4 + (50 - ropePosition) * 0.8;
   const knotPercent = ropePosition;
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="size-full bg-gradient-to-b from-indigo-400 via-purple-400 to-pink-400 flex items-center justify-center">
+        <div className="bg-white rounded-3xl p-8 shadow-2xl text-center">
+          <div className="text-6xl mb-4">🤖</div>
+          <h2 className="text-2xl font-bold mb-2">Generating AI Questions...</h2>
+          <p className="text-gray-600">Creating personalized math problems for you!</p>
+          <div className="mt-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="size-full bg-gradient-to-b from-indigo-400 via-purple-400 to-pink-400 flex items-center justify-center">
+        <div className="bg-white rounded-3xl p-8 shadow-2xl text-center max-w-md">
+          <div className="text-6xl mb-4">😞</div>
+          <h2 className="text-2xl font-bold mb-2">Oops!</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => fetchQuestions()}
+            className="bg-purple-500 text-white px-6 py-2 rounded-full hover:bg-purple-600 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No questions loaded yet
+  if (!currentQuestion) {
+    return (
+      <div className="size-full bg-gradient-to-b from-indigo-400 via-purple-400 to-pink-400 flex items-center justify-center">
+        <div className="bg-white rounded-3xl p-8 shadow-2xl text-center">
+          <div className="text-6xl mb-4">📚</div>
+          <h2 className="text-2xl font-bold mb-2">Preparing Questions...</h2>
+          <p className="text-gray-600">Getting ready for your math challenge!</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="size-full bg-gradient-to-b from-indigo-400 via-purple-400 to-pink-400">
@@ -201,6 +279,15 @@ export default function GameScreen() {
               style={{ width: `${(questionNumber / totalQuestions) * 100}%` }}
             />
           </div>
+
+          {/* AI Indicator */}
+          {isAIGenerated && (
+            <div className="mt-2 text-center">
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                🤖 AI Generated
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Tug of War Scene */}
@@ -224,7 +311,7 @@ export default function GameScreen() {
           <div className="absolute top-1.5 left-2 text-[9px] sm:text-[10px] font-bold text-green-800 bg-green-300/60 px-1.5 py-0.5 rounded-full z-30">🏆 WIN</div>
           <div className="absolute top-1.5 right-2 text-[9px] sm:text-[10px] font-bold text-red-800 bg-red-300/60 px-1.5 py-0.5 rounded-full z-30">LOSE 💀</div>
 
-          {/* === PLAYER (left side) — stays at edge when winning, pulled right when losing === */}
+          {/* === PLAYER (left side) */}
           <motion.div
             className="absolute bottom-[30%] z-20 origin-bottom"
             animate={{ left: `${playerX}%`, rotate: playerLean }}
@@ -250,7 +337,7 @@ export default function GameScreen() {
             )}
           </motion.div>
 
-          {/* === ROPE — stretches between the two characters === */}
+          {/* === ROPE */}
           <motion.div
             className="absolute bottom-[44%] z-10"
             animate={{ left: `${playerX + 6}%`, right: `${robotX + 6}%` }}
@@ -260,7 +347,7 @@ export default function GameScreen() {
               <div className="absolute inset-0 bg-gradient-to-r from-amber-700 via-amber-500 to-amber-700 rounded-full shadow-md" />
               <div className="absolute inset-0 rounded-full opacity-25" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent 0px, transparent 6px, rgba(0,0,0,0.2) 6px, rgba(0,0,0,0.2) 8px)' }} />
               <div className="absolute top-0 left-0 right-0 h-[35%] bg-white/15 rounded-full" />
-              {/* Knot/Flag — positioned by ropePosition mapped into the rope's own width */}
+              {/* Knot/Flag */}
               <motion.div
                 className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20"
                 animate={{ left: `${knotPercent}%` }}
@@ -277,7 +364,7 @@ export default function GameScreen() {
             </div>
           </motion.div>
 
-          {/* === ROBOT (right side) — stays at edge when winning, pulled left when losing === */}
+          {/* === ROBOT (right side) */}
           <motion.div
             className="absolute bottom-[30%] z-20 origin-bottom"
             animate={{ right: `${robotX}%`, rotate: robotLean }}
@@ -347,13 +434,26 @@ export default function GameScreen() {
                 transition={{ duration: 0.25 }}
                 className="bg-white rounded-[1.25rem] sm:rounded-[1.5rem] p-4 sm:p-6 shadow-xl text-center"
               >
+                {/* Question Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{getCategoryIcon(currentQuestion.category)}</span>
+                    <span className={`text-xs font-medium ${getDifficultyColor(currentQuestion.difficulty)}`}>
+                      {currentQuestion.difficulty}
+                    </span>
+                  </div>
+                  {isAIGenerated && (
+                    <span className="text-xs text-purple-600 font-medium">🤖 AI</span>
+                  )}
+                </div>
+
                 <p className="text-xs sm:text-sm text-gray-400 mb-2 font-medium">Solve this:</p>
-                <div className="text-4xl sm:text-5xl md:text-6xl text-gray-800 font-extrabold mb-3 sm:mb-4">
-                  {currentQuestion.num1} {currentQuestion.operation} {currentQuestion.num2} = ?
+                <div className="text-3xl sm:text-4xl md:text-5xl text-gray-800 font-extrabold mb-3 sm:mb-4">
+                  {formatQuestion(currentQuestion)}
                 </div>
 
                 {/* Answer Display */}
-                <div className={`rounded-2xl p-3 sm:p-4 min-h-[56px] sm:min-h-[68px] flex items-center justify-center border-3 transition-all duration-200 ${
+                <div className={`rounded-2xl p-3 sm:p-4 min-h-[56px] sm:min-h-[68px] flex items-center justify-center border-2 outline-none transition-all duration-200 ${
                   feedback === 'correct' ? 'border-green-500 bg-green-50' :
                   feedback === 'wrong' ? 'border-red-500 bg-red-50' :
                   'border-gray-200 bg-gray-50'
@@ -363,9 +463,16 @@ export default function GameScreen() {
                       <div className={`text-4xl sm:text-5xl mb-1 ${feedback === 'correct' ? 'text-green-500' : 'text-red-500'}`}>
                         {feedback === 'correct' ? '✓' : '✗'}
                       </div>
-                      <p className="text-sm sm:text-base font-bold">
+                      <p className="text-sm sm:text-base font-bold mb-2">
                         {feedback === 'correct' ? 'Correct! 🎉' : `Answer: ${currentQuestion.answer}`}
                       </p>
+                      {showExplanation && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                          <p className="text-xs sm:text-sm text-blue-800">
+                            <strong>Explanation:</strong> {currentQuestion.explanation}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <span className="text-3xl sm:text-4xl text-gray-800 font-bold">{userAnswer || <span className="text-gray-300 text-lg">Type your answer</span>}</span>

@@ -12,6 +12,7 @@ import ResultScreen from "./components/ResultScreen";
 import Leaderboard from "./components/Leaderboard";
 import ProfileScreen from "./components/ProfileScreen";
 import AuthScreen from "./components/AuthScreen";
+import AIGameScreen from "../components/AIGameScreen";
 
 export const router = createBrowserRouter([
   {
@@ -65,5 +66,9 @@ export const router = createBrowserRouter([
   {
     path: "/profile",
     Component: ProfileScreen,
+  },
+  {
+    path: "/ai-game",
+    Component: AIGameScreen,
   },
 ]);

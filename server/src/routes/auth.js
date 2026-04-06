@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const { getDb } = require('../db/setup');
+const { getDb } = require('../db/mongodb');
 
 const router = express.Router();
 
@@ -15,7 +15,7 @@ function generateToken(user) {
 }
 
 // POST /api/auth/register
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
@@ -27,9 +27,11 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 4 characters' });
     }
 
-    const db = getDb();
+    const db = await getDb();
 
-    const existing = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, username);
+    const existing = await db.collection('users').findOne({
+      $or: [{ email }, { username }]
+    });
     if (existing) {
       return res.status(409).json({ error: 'Username or email already exists' });
     }
@@ -37,11 +39,26 @@ router.post('/register', (req, res) => {
     const id = uuidv4();
     const password_hash = bcrypt.hashSync(password, 10);
 
-    db.prepare(
-      'INSERT INTO users (id, username, email, password_hash, is_guest) VALUES (?, ?, ?, ?, 0)'
-    ).run(id, username, email, password_hash);
+    const newUser = {
+      id,
+      username,
+      email,
+      password_hash,
+      is_guest: 0,
+      avatar: '👦',
+      total_points: 0,
+      matches_played: 0,
+      wins: 0,
+      losses: 0,
+      accuracy: 0,
+      best_streak: 0,
+      level: 1,
+      created_at: new Date().toISOString()
+    };
 
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    await db.collection('users').insertOne(newUser);
+
+    const user = await db.collection('users').findOne({ id });
     const token = generateToken(user);
 
     res.status(201).json({
@@ -62,7 +79,7 @@ router.post('/register', (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -70,8 +87,8 @@ router.post('/login', (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const db = getDb();
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const db = await getDb();
+    const user = await db.collection('users').findOne({ email });
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -101,20 +118,33 @@ router.post('/login', (req, res) => {
 });
 
 // POST /api/auth/guest
-router.post('/guest', (req, res) => {
+router.post('/guest', async (req, res) => {
   try {
-    const db = getDb();
+    const db = await getDb();
     const id = uuidv4();
     const guestNum = Math.floor(Math.random() * 9000) + 1000;
     const username = `Guest_${guestNum}`;
     const avatars = ['👦', '👧', '🧒', '👶', '🐱', '🐶', '🦊', '🐻'];
     const avatar = avatars[Math.floor(Math.random() * avatars.length)];
 
-    db.prepare(
-      'INSERT INTO users (id, username, avatar, is_guest) VALUES (?, ?, ?, 1)'
-    ).run(id, username, avatar);
+    const newUser = {
+      id,
+      username,
+      avatar,
+      is_guest: 1,
+      total_points: 0,
+      matches_played: 0,
+      wins: 0,
+      losses: 0,
+      accuracy: 0,
+      best_streak: 0,
+      level: 1,
+      created_at: new Date().toISOString()
+    };
 
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    await db.collection('users').insertOne(newUser);
+
+    const user = await db.collection('users').findOne({ id });
     const token = generateToken(user);
 
     res.status(201).json({

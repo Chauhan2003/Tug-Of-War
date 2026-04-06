@@ -1,42 +1,51 @@
 const express = require('express');
-const { getDb } = require('../db/setup');
+const { getDb } = require('../db/mongodb');
 const { optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
 // GET /api/leaderboard
-router.get('/', optionalAuth, (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const db = getDb();
+    const db = await getDb();
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = parseInt(req.query.offset) || 0;
 
-    const players = db.prepare(`
-      SELECT id, username, avatar, total_points, wins, losses, matches_played, level,
-             ROW_NUMBER() OVER (ORDER BY total_points DESC) as rank
-      FROM users
-      ORDER BY total_points DESC
-      LIMIT ? OFFSET ?
-    `).all(limit, offset);
+    const players = await db.collection('users')
+      .find({})
+      .sort({ total_points: -1 })
+      .skip(offset)
+      .limit(limit)
+      .project({
+        id: 1,
+        username: 1,
+        avatar: 1,
+        total_points: 1,
+        wins: 1,
+        losses: 1,
+        matches_played: 1,
+        level: 1
+      })
+      .toArray();
 
-    const total = db.prepare('SELECT COUNT(*) as count FROM users').get();
+    const total = await db.collection('users').countDocuments();
 
     let currentUserRank = null;
     if (req.user) {
-      currentUserRank = db.prepare(`
-        SELECT rank FROM (
-          SELECT id, ROW_NUMBER() OVER (ORDER BY total_points DESC) as rank FROM users
-        ) WHERE id = ?
-      `).get(req.user.id);
+      const usersWithHigherScore = await db.collection('users').countDocuments({
+        total_points: { $gt: req.user.total_points || 0 }
+      });
+      currentUserRank = usersWithHigherScore + 1;
     }
 
     res.json({
-      players: players.map((p) => ({
+      players: players.map((p, index) => ({
         ...p,
+        rank: offset + index + 1,
         isCurrentUser: req.user ? p.id === req.user.id : false,
       })),
-      total: total.count,
-      currentUserRank: currentUserRank ? currentUserRank.rank : null,
+      total,
+      currentUserRank,
     });
   } catch (err) {
     console.error('Leaderboard error:', err);

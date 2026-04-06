@@ -81,7 +81,14 @@ export default function LevelSelection() {
               initial={{ x: -30, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.07 * index, type: 'spring', stiffness: 300, damping: 24 }}
-              onClick={() => level.unlocked && navigate('/mode-selection')}
+              onClick={() => level.unlocked && navigate('/mode-selection', { 
+                state: { 
+                  classId: parseInt(classId || '1'), 
+                  levelId: level.id,
+                  className: `Class ${classId}`,
+                  levelName: `Level ${level.level_number}`
+                } 
+              })}
               disabled={!level.unlocked}
               className={`w-full bg-gradient-to-r ${level.color} rounded-[1.25rem] sm:rounded-[1.5rem] p-3.5 sm:p-4 shadow-xl transform transition-all duration-200 relative ${
                 level.unlocked
@@ -100,7 +107,7 @@ export default function LevelSelection() {
                     {index + 1}
                   </div>
                   <div className="text-left">
-                    <h3 className="text-base sm:text-lg font-bold mb-0.5">Level {level.id}</h3>
+                    <h3 className="text-base sm:text-lg font-bold mb-0.5">Level {level.level_number}</h3>
                     <div className="flex gap-0.5 mb-0.5">
                       {[1, 2, 3].map((s) => (
                         <span key={s} className={`text-sm sm:text-base ${s <= level.stars ? '' : 'opacity-30'}`}>⭐</span>
