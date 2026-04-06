@@ -114,7 +114,7 @@ async function seedData(db) {
         name: 'Class 1',
         emoji: '🌱',
         color: 'from-green-400 to-emerald-500',
-        description: 'Addition Basics',
+        description: 'Basic Operations',
         unlock_level: 1
       },
       {
@@ -122,7 +122,7 @@ async function seedData(db) {
         name: 'Class 2',
         emoji: '🌿',
         color: 'from-blue-400 to-cyan-500',
-        description: 'Subtraction Fun',
+        description: 'Mixed Operations',
         unlock_level: 1
       },
       {
@@ -130,24 +130,8 @@ async function seedData(db) {
         name: 'Class 3',
         emoji: '🌳',
         color: 'from-purple-400 to-violet-500',
-        description: 'Multiplication',
+        description: 'Advanced Operations',
         unlock_level: 3
-      },
-      {
-        id: 4,
-        name: 'Class 4',
-        emoji: '🎯',
-        color: 'from-orange-400 to-red-500',
-        description: 'Division World',
-        unlock_level: 5
-      },
-      {
-        id: 5,
-        name: 'Class 5',
-        emoji: '🏆',
-        color: 'from-yellow-400 to-amber-500',
-        description: 'Mixed Challenge',
-        unlock_level: 7
       }
     ];
 
@@ -157,77 +141,47 @@ async function seedData(db) {
     // Insert levels for each class
     const levels = [];
     
-    // Class 1: Addition
+    // Class 1: Basic Operations - Addition and Subtraction
     for (let i = 1; i <= 5; i++) {
       levels.push({
         class_id: 1,
         level_number: i,
         name: `Level ${i}`,
-        operations: '+',
+        operations: '+-',
         min_number: 1,
-        max_number: 10 + i * 5,
+        max_number: 10 + i * 8,
         questions_count: 10,
         time_limit: 60,
         stars_required: (i - 1) * 2
       });
     }
     
-    // Class 2: Subtraction
+    // Class 2: Mixed Operations - All four operations with moderate difficulty
     for (let i = 1; i <= 5; i++) {
       levels.push({
         class_id: 2,
         level_number: i,
         name: `Level ${i}`,
-        operations: '-',
+        operations: '+-*/',
         min_number: 1,
-        max_number: 10 + i * 5,
+        max_number: 15 + i * 10,
         questions_count: 10,
-        time_limit: 60,
+        time_limit: 75,
         stars_required: (i - 1) * 2
       });
     }
     
-    // Class 3: Multiplication
+    // Class 3: Advanced Operations - All four operations with higher difficulty
     for (let i = 1; i <= 5; i++) {
       levels.push({
         class_id: 3,
         level_number: i,
         name: `Level ${i}`,
-        operations: '*',
-        min_number: 1,
-        max_number: 5 + i * 2,
-        questions_count: 10,
-        time_limit: 90,
-        stars_required: (i - 1) * 2
-      });
-    }
-    
-    // Class 4: Division
-    for (let i = 1; i <= 5; i++) {
-      levels.push({
-        class_id: 4,
-        level_number: i,
-        name: `Level ${i}`,
-        operations: '/',
-        min_number: 1,
-        max_number: 5 + i * 2,
-        questions_count: 10,
-        time_limit: 90,
-        stars_required: (i - 1) * 2
-      });
-    }
-    
-    // Class 5: Mixed
-    for (let i = 1; i <= 5; i++) {
-      levels.push({
-        class_id: 5,
-        level_number: i,
-        name: `Level ${i}`,
         operations: '+-*/',
-        min_number: 1,
-        max_number: 10 + i * 5,
+        min_number: 5 + i * 3,
+        max_number: 25 + i * 15,
         questions_count: 10,
-        time_limit: 60,
+        time_limit: 90,
         stars_required: (i - 1) * 2
       });
     }

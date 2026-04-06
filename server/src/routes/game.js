@@ -1,4 +1,5 @@
 const express = require('express');
+const { ObjectId } = require('mongodb');
 const { getDb } = require('../db/mongodb');
 const { authenticateToken } = require('../middleware/auth');
 const { validate, schemas } = require('../utils/validation');
@@ -19,7 +20,7 @@ router.get('/classes', authenticateToken, asyncHandler(async (req, res) => {
 
   const result = classes.map((c) => ({
     ...c,
-    unlocked: user.level >= c.unlock_level,
+    unlocked: true, // All classes are now unlocked
   }));
 
   res.json(result);
@@ -58,7 +59,7 @@ router.get('/classes/:classId/levels', authenticateToken, asyncHandler(async (re
       stars: p ? p.stars : 0,
       best_score: p ? p.best_score : 0,
       completed: p ? p.completed : 0,
-      unlocked: totalStars >= level.stars_required || level.level_number === 1,
+      unlocked: true, // All levels are now unlocked
     };
   });
 
@@ -75,7 +76,9 @@ router.post('/question', authenticateToken, validate(schemas.getQuestion), async
   let maxNum = 20;
 
   if (levelId) {
-    const level = await db.collection('levels').findOne({ _id: levelId });
+    let lid = levelId;
+    try { lid = new ObjectId(levelId); } catch(e) {}
+    const level = await db.collection('levels').findOne({ _id: lid });
     if (level) {
       operations = level.operations;
       minNum = level.min_number;
@@ -194,8 +197,12 @@ router.post('/result', authenticateToken, asyncHandler(async (req, res) => {
   // Get current user stats
   const currentUser = await db.collection('users').findOne(
     { id: userId },
-    { projection: { total_points: 1, matches_played: 1, accuracy: 1, best_streak: 1, level: 1 } }
+    { projection: { total_points: 1, matches_played: 1, wins: 1, losses: 1, accuracy: 1, best_streak: 1, level: 1 } }
   );
+
+  if (!currentUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
 
   // Calculate new accuracy
   const newMatchesPlayed = currentUser.matches_played + 1;

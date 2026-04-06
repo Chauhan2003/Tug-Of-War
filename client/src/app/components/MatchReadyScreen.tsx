@@ -43,7 +43,7 @@ export default function MatchReadyScreen() {
       return () => clearTimeout(timer);
     } else if (!isMultiplayer) {
       // Single-player: go to regular game
-      const timer = setTimeout(() => navigate('/game'), 600);
+      const timer = setTimeout(() => navigate('/game', { state: multiplayerState }), 600);
       return () => clearTimeout(timer);
     }
     // For multiplayer, we wait for the game-start socket event

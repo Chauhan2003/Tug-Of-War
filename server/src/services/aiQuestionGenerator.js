@@ -102,14 +102,40 @@ class AIQuestionGenerator {
     const operations = classInfo.operations || '+-*/';
     const difficulty = this.getDifficultyDescription(levelInfo);
     const questionCount = levelInfo.questions_count || 10;
+    const maxNum = levelInfo.max_number || 20;
+    
+    // Adjust prompt based on difficulty
+    let difficultyInstructions = '';
+    if (difficulty === 'expert') {
+      difficultyInstructions = `
+- Include multi-step problems and word problems
+- Use larger numbers and more complex operations
+- Include problems that require mental math strategies
+- Challenge students with estimation and problem-solving skills`;
+    } else if (difficulty === 'advanced') {
+      difficultyInstructions = `
+- Include some multi-step problems
+- Use moderate to large numbers
+- Mix of straightforward and slightly complex problems`;
+    } else if (difficulty === 'intermediate') {
+      difficultyInstructions = `
+- Focus on core skill practice
+- Use moderate number ranges
+- Include some variation in problem types`;
+    } else {
+      difficultyInstructions = `
+- Focus on basic skill building
+- Use smaller, manageable numbers
+- Clear, straightforward problems`;
+    }
     
     return `Generate ${questionCount} math questions for a ${classInfo.description} course at ${difficulty} difficulty level.
 
 Requirements:
 - Operations: ${operations.split('').join(', ')}
-- Number range: ${levelInfo.min_number || 1} to ${levelInfo.max_number || 20}
+- Number range: ${levelInfo.min_number || 1} to ${maxNum}
 - Each question should be appropriate for students at level ${levelInfo.level_number}
-- Include a mix of problem types and difficulty within the level
+${difficultyInstructions}
 - All answers must be integers (no fractions or decimals for division problems)
 - Ensure division problems result in whole numbers
 
@@ -124,7 +150,7 @@ Return a JSON object with this exact structure:
       "operation": "+",
       "answer": 23,
       "explanation": "To solve 15 + 8, we add 15 and 8 to get 23.",
-      "difficulty": "easy",
+      "difficulty": "${difficulty}",
       "category": "addition"
     }
   ],
@@ -218,10 +244,14 @@ Make sure all mathematical calculations are correct and the explanations are cle
   // Get difficulty description
   getDifficultyDescription(levelInfo) {
     const level = levelInfo.level_number || 1;
+    const maxNum = levelInfo.max_number || 20;
     
-    if (level <= 2) return 'beginner';
-    if (level <= 4) return 'intermediate';
-    return 'advanced';
+    // More sophisticated difficulty based on both level and number range
+    if (level <= 2 && maxNum <= 35) return 'beginner';
+    if (level <= 3 && maxNum <= 65) return 'intermediate';
+    if (level <= 4 && maxNum <= 100) return 'advanced';
+    if (maxNum > 100) return 'expert';
+    return 'intermediate';
   }
 
   // Get class information

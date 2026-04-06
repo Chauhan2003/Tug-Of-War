@@ -108,11 +108,9 @@ function seedData(db) {
   );
 
   const classes = [
-    [1, 'Class 1', '🌱', 'from-green-400 to-emerald-500', 'Addition Basics', 1],
-    [2, 'Class 2', '🌿', 'from-blue-400 to-cyan-500', 'Subtraction Fun', 1],
-    [3, 'Class 3', '🌳', 'from-purple-400 to-violet-500', 'Multiplication', 3],
-    [4, 'Class 4', '🎯', 'from-orange-400 to-red-500', 'Division World', 5],
-    [5, 'Class 5', '🏆', 'from-yellow-400 to-amber-500', 'Mixed Challenge', 7],
+    [1, 'Class 1', '🌱', 'from-green-400 to-emerald-500', 'Basic Operations', 1],
+    [2, 'Class 2', '🌿', 'from-blue-400 to-cyan-500', 'Mixed Operations', 1],
+    [3, 'Class 3', '🌳', 'from-purple-400 to-violet-500', 'Advanced Operations', 3],
   ];
 
   const insertLevel = db.prepare(
@@ -124,25 +122,17 @@ function seedData(db) {
       insertClass.run(...c);
     }
 
-    // Class 1: Addition
+    // Class 1: Basic Operations - Addition and Subtraction
     for (let i = 1; i <= 5; i++) {
-      insertLevel.run(1, i, `Level ${i}`, '+', 1, 10 + i * 5, 10, 60, (i - 1) * 2);
+      insertLevel.run(1, i, `Level ${i}`, '+-', 1, 10 + i * 8, 10, 60, (i - 1) * 2);
     }
-    // Class 2: Subtraction
+    // Class 2: Mixed Operations - All four operations with moderate difficulty
     for (let i = 1; i <= 5; i++) {
-      insertLevel.run(2, i, `Level ${i}`, '-', 1, 10 + i * 5, 10, 60, (i - 1) * 2);
+      insertLevel.run(2, i, `Level ${i}`, '+-*/', 1, 15 + i * 10, 10, 75, (i - 1) * 2);
     }
-    // Class 3: Multiplication
+    // Class 3: Advanced Operations - All four operations with higher difficulty
     for (let i = 1; i <= 5; i++) {
-      insertLevel.run(3, i, `Level ${i}`, '*', 1, 5 + i * 2, 10, 90, (i - 1) * 2);
-    }
-    // Class 4: Division
-    for (let i = 1; i <= 5; i++) {
-      insertLevel.run(4, i, `Level ${i}`, '/', 1, 5 + i * 2, 10, 90, (i - 1) * 2);
-    }
-    // Class 5: Mixed
-    for (let i = 1; i <= 5; i++) {
-      insertLevel.run(5, i, `Level ${i}`, '+-*/', 1, 10 + i * 5, 10, 60, (i - 1) * 2);
+      insertLevel.run(3, i, `Level ${i}`, '+-*/', 5 + i * 3, 25 + i * 15, 10, 90, (i - 1) * 2);
     }
   });
 

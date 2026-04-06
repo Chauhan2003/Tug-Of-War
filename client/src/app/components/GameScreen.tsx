@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { apiSubmitResult } from '../../lib/api';
+import { apiSubmitResult, apiGetQuestion } from '../../lib/api';
 
 interface Question {
   num1: number;
@@ -12,6 +12,11 @@ interface Question {
 
 export default function GameScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const gameState = (location.state as any) || {};
+  const classId = gameState.classId;
+  const levelId = gameState.levelId;
+
   const [timeLeft, setTimeLeft] = useState(60);
   const [questionNumber, setQuestionNumber] = useState(1);
   const [totalQuestions] = useState(10);
@@ -26,15 +31,24 @@ export default function GameScreen() {
   const gameOverRef = useRef(false);
 
   const generateQuestion = useCallback(() => {
-    const num1 = Math.floor(Math.random() * 20) + 1;
-    const num2 = Math.floor(Math.random() * 20) + 1;
-    const operations = ['+', '-'];
-    const operation = operations[Math.floor(Math.random() * operations.length)];
-    const answer = operation === '+' ? num1 + num2 : num1 - num2;
-    setCurrentQuestion({ num1, num2, answer, operation });
-    setUserAnswer('');
-    setFeedback(null);
-  }, []);
+    apiGetQuestion(classId, levelId)
+      .then((q: any) => {
+        setCurrentQuestion({ num1: q.num1, num2: q.num2, answer: q.answer, operation: q.operation });
+        setUserAnswer('');
+        setFeedback(null);
+      })
+      .catch(() => {
+        // Fallback to local generation if API fails
+        const num1 = Math.floor(Math.random() * 20) + 1;
+        const num2 = Math.floor(Math.random() * 20) + 1;
+        const operations = ['+', '-'];
+        const operation = operations[Math.floor(Math.random() * operations.length)];
+        const answer = operation === '+' ? num1 + num2 : num1 - num2;
+        setCurrentQuestion({ num1, num2, answer, operation });
+        setUserAnswer('');
+        setFeedback(null);
+      });
+  }, [classId, levelId]);
 
   useEffect(() => {
     generateQuestion();
@@ -62,6 +76,8 @@ export default function GameScreen() {
     // Submit to backend (fire-and-forget, don't block navigation)
     apiSubmitResult({
       mode: 'single',
+      classId,
+      levelId,
       playerScore: score.player1,
       opponentScore: score.player2,
       totalQuestions,
